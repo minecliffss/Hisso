@@ -1,44 +1,20 @@
-'use client';
+import * as React from "react"
+import { Input as InputPrimitive } from "@base-ui/react/input"
 
-import * as React from 'react';
-import { cn } from '@/lib/utils/cn';
+import { cn } from "@/lib/utils"
 
-export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
-  label?: string;
-  error?: string;
-  onChange?: (value: string) => void;
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  return (
+    <InputPrimitive
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, onChange, ...props }, ref) => {
-    return (
-      <div className="w-full">
-        {label && (
-          <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-            {label}
-          </label>
-        )}
-        <input
-          ref={ref}
-          className={cn(
-            'flex w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200',
-            'placeholder:text-zinc-500',
-            'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-red-500 focus:ring-red-500',
-            className
-          )}
-          onChange={(e) => onChange?.(e.target.value)}
-          {...props}
-        />
-        {error && (
-          <p className="mt-1 text-xs text-red-500">{error}</p>
-        )}
-      </div>
-    );
-  }
-);
-
-Input.displayName = 'Input';
-
-export { Input };
+export { Input }

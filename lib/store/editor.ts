@@ -75,6 +75,9 @@ interface EditorState {
   // Tools (minimal — select, text, hand)
   activeTool: ToolType;
 
+  // Theme
+  isDark: boolean;
+
   // Selection
   selectedObject: FabricObject | null;
   selectedLayerId: string | null;
@@ -116,6 +119,9 @@ interface EditorActions {
 
   // Tools
   setActiveTool: (tool: ToolType) => void;
+
+  // Theme
+  toggleTheme: () => void;
 
   // Selection
   setSelectedObject: (obj: FabricObject | null) => void;
@@ -167,6 +173,7 @@ const initialState: EditorState = {
   gridSize: 20,
   snapToGrid: false,
   activeTool: 'select',
+  isDark: true,
   selectedObject: null,
   selectedLayerId: null,
   layers: [],
@@ -236,6 +243,9 @@ export const useEditorStore = create<EditorStore>()(
 
     // Tool Actions
     setActiveTool: (tool) => set({ activeTool: tool }),
+
+    // Theme
+    toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
 
     // Selection Actions
     setSelectedObject: (obj) => set({ selectedObject: obj }),
