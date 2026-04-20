@@ -157,6 +157,9 @@ interface EditorActions {
   // Export
   setExportFormat: (format: 'png' | 'jpg' | 'webp') => void;
   setExportQuality: (quality: number) => void;
+
+  // Global
+  resetEditor: () => void;
 }
 
 // Combined Store Type
@@ -256,7 +259,7 @@ export const useEditorStore = create<EditorStore>()(
     addLayer: (layerData) => {
       const { layers } = get();
       const newLayer: Layer = {
-        id: generateId(),
+        id: layerData.id || generateId(),
         name: layerData.name || `Layer ${layers.length + 1}`,
         type: layerData.type || 'image',
         visible: true,
@@ -421,6 +424,14 @@ export const useEditorStore = create<EditorStore>()(
     // Export Actions
     setExportFormat: (format) => set({ exportFormat: format }),
     setExportQuality: (quality) => set({ exportQuality: quality }),
+
+    // Global
+    resetEditor: () => set((state) => {
+      Object.assign(state, {
+        ...initialState,
+        canvas: state.canvas, // preserve canvas reference
+      });
+    }),
   }))
 );
 

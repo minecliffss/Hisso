@@ -220,16 +220,18 @@ export const exportCanvas = (
 export const loadImageToCanvas = async (
   canvas: Canvas,
   url: string,
-  options: Partial<Layer> = {}
+  options: Partial<Layer> & { layerId?: string } = {}
 ): Promise<FabricImage> => {
   const img = await FabricImage.fromURL(url, {
     crossOrigin: 'anonymous',
   });
+  const id = options.layerId || generateId();
   img.set({
     left: options.x ?? (canvas.width || 0) / 2 - ((img.width || 0) * (img.scaleX || 1)) / 2,
     top: options.y ?? (canvas.height || 0) / 2 - ((img.height || 0) * (img.scaleY || 1)) / 2,
   } as any);
-  (img as any).id = generateId();
+  (img as any).id = id;
+  (img as any).layerId = id;
   canvas.add(img);
   canvas.setActiveObject(img);
   canvas.renderAll();
