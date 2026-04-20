@@ -75,7 +75,7 @@ export function LayersSection() {
     const objects = canvas.getObjects();
     for (const layer of updatedLayers) {
       const obj = objects.find((o: any) => o.id === layer.id || o.layerId === layer.id);
-      if (obj) canvas.bringObjectToFront(obj);
+      if (obj) (canvas as any).bringObjectToFront(obj);
     }
     canvas.renderAll();
   };

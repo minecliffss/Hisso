@@ -15,5 +15,5 @@ export const getSupabaseAdmin = () => {
   if (!serviceRoleKey) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not defined');
   }
-  return createClient(supabaseUrl, serviceRoleKey);
+  return createClient(supabaseUrl || '', serviceRoleKey);
 };

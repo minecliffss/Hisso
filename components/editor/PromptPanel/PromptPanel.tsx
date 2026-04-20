@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { loadImageToCanvas } from '@/lib/canvas/fabric';
+import { generateId } from '@/lib/utils/helpers';
 import type { AIModel, AIJob } from '@/types';
 
 const MODELS: { value: AIModel; label: string }[] = [
@@ -137,13 +139,16 @@ export function PromptPanel() {
   const isGenerating = useEditorStore((s) => s.isGenerating);
   const setIsGenerating = useEditorStore((s) => s.setIsGenerating);
   const addAIJob = useEditorStore((s) => s.addAIJob);
+  const updateAIJob = useEditorStore((s) => s.updateAIJob);
+  const addLayer = useEditorStore((s) => s.addLayer);
   
   const [toolsModalOpen, setToolsModalOpen] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!aiPrompt.trim() || isGenerating) return;
+    const jobId = `job-${Date.now()}`;
     const job: AIJob = {
-      id: `job-${Date.now()}`,
+      id: jobId,
       type: 'text-to-image',
       model: aiModel,
       status: 'processing',
@@ -154,6 +159,55 @@ export function PromptPanel() {
     };
     addAIJob(job);
     setIsGenerating(true);
+
+    try {
+      // We are only implementing flux for now but it can handle others later
+      const response = await fetch('/api/generate/flux', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+
+      if (!response.ok) {
+        let errText = 'Failed to generate image';
+        try {
+          const errJson = await response.json();
+          errText += ': ' + (errJson.details || errJson.error || JSON.stringify(errJson));
+        } catch(e) {
+          errText += ' (status: ' + response.status + ')';
+        }
+        throw new Error(errText);
+      }
+
+      const data = await response.json();
+      if (data.imageUrl) {
+        // Add the image to the canvas
+        const canvas = useEditorStore.getState().canvas;
+        if (canvas) {
+          const layerId = generateId();
+          const img = await loadImageToCanvas(canvas as any, data.imageUrl, { layerId });
+          
+          addLayer({
+            id: layerId,
+            type: 'image',
+            src: data.imageUrl,
+            name: `Generated: ${aiPrompt.slice(0, 15)}...`,
+            width: (img.width || 0) * (img.scaleX || 1),
+            height: (img.height || 0) * (img.scaleY || 1),
+            x: img.left || 0,
+            y: img.top || 0,
+          });
+        }
+        updateAIJob(jobId, { status: 'completed', progress: 100 });
+      } else {
+        throw new Error(data.error || 'No image URL returned');
+      }
+    } catch (error) {
+      console.error(error);
+      updateAIJob(jobId, { status: 'failed' });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleToolSelect = (tool: AITool) => {
