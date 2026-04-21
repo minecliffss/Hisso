@@ -396,10 +396,9 @@ export function CanvasComponent() {
         onChange={handleImageAttach}
         className="hidden"
       />
-      
 
-      {/* Main Canvas - Fixed, fills container, no scroll */}
-      <div 
+      {/* Main Canvas - Endless with zoom controls */}
+      <div
         ref={containerRef}
         className="relative flex-1 overflow-hidden"
         style={{ backgroundColor: isDark ? '#0a0a0a' : '#f5f5f5' }}
@@ -407,10 +406,10 @@ export function CanvasComponent() {
         onDrop={handleDrop}
         onMouseDown={handleMouseDown}
       >
-        {/* Grid layer */}
+        {/* Grid layer - infinite pattern */}
         {showGrid && (
-          <svg 
-            className="absolute inset-0 pointer-events-none z-[1]" 
+          <svg
+            className="absolute inset-0 pointer-events-none z-[1]"
             style={{ width: '100%', height: '100%' }}
           >
             {renderGrid()}
@@ -418,10 +417,61 @@ export function CanvasComponent() {
         )}
 
         {/* Canvas element - fills entire container */}
-        <canvas 
-          ref={canvasRef} 
-          className="absolute inset-0 w-full h-full"
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
         />
+
+        {/* Zoom Controls - Floating on bottom right of board */}
+        <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-50 bg-background/90 backdrop-blur-sm border rounded-lg shadow-lg p-1">
+          {/* Zoom In */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={zoomIn}
+            className="h-8 w-8 hover:bg-accent"
+            title="Zoom In (Ctrl + Scroll Up)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v8M8 12h8" />
+            </svg>
+          </Button>
+          
+          {/* Zoom Level Indicator */}
+          <div className="h-8 w-8 flex items-center justify-center text-[10px] font-medium text-muted-foreground border-y">
+            {Math.round(zoom * 100)}%
+          </div>
+          
+          {/* Zoom Out */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={zoomOut}
+            className="h-8 w-8 hover:bg-accent"
+            title="Zoom Out (Ctrl + Scroll Down)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12h8" />
+            </svg>
+          </Button>
+          
+          {/* Reset Zoom */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={resetZoom}
+            className="h-8 w-8 hover:bg-accent border-t"
+            title="Reset Zoom"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" />
+              <path d="M3 3v9h9" />
+            </svg>
+          </Button>
+        </div>
+
       </div>
     </div>
   );

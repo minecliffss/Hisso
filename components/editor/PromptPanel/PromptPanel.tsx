@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useEditorStore } from '@/lib/store/editor';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -13,11 +14,12 @@ import {
 } from '@/components/ui/select';
 import { loadImageToCanvas } from '@/lib/canvas/fabric';
 import { generateId } from '@/lib/utils/helpers';
-import type { AIModel, AIJob } from '@/types';
+import type { AIModel, AIJob, AnalysisResult } from '@/types';
 
 const MODELS: { value: AIModel; label: string }[] = [
-  { value: 'qwen-image', label: 'Qwen Image' },
   { value: 'flux', label: 'FLUX' },
+  { value: 'nvidia-kimi', label: 'NVIDIA Kimi' },
+  { value: 'qwen-image', label: 'Qwen Image' },
   { value: 'sdxl', label: 'SDXL' },
   { value: 'stable-diffusion', label: 'Stable Diffusion' },
 ];
@@ -143,9 +145,54 @@ export function PromptPanel() {
   const addLayer = useEditorStore((s) => s.addLayer);
   
   const [toolsModalOpen, setToolsModalOpen] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) setAttachments((prev) => [...prev, dataUrl]);
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Analyze reference image to get a descriptive prompt
+  const analyzeReferenceImage = async (image: string, userPrompt: string): Promise<AnalysisResult | null> => {
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image,
+          userPrompt: userPrompt || 'Analyze this image for recreation',
+          mode: 'analyze-and-generate',
+          model: 'kimi', // Default to kimi for analysis as requested
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to analyze image');
+      const data = await response.json();
+      return data.success ? data : null;
+    } catch (error) {
+      console.error('Analysis error:', error);
+      return null;
+    }
+  };
 
   const handleGenerate = async () => {
-    if (!aiPrompt.trim() || isGenerating) return;
+    if (!aiPrompt.trim() && attachments.length === 0) return;
+    if (isGenerating) return;
+
     const jobId = `job-${Date.now()}`;
     const job: AIJob = {
       id: jobId,
@@ -161,11 +208,29 @@ export function PromptPanel() {
     setIsGenerating(true);
 
     try {
-      // We are only implementing flux for now but it can handle others later
+      let finalPrompt = aiPrompt;
+
+      // STEP 1: If reference image exists, analyze it first to ensure correspondence
+      if (attachments.length > 0) {
+        setIsAnalyzing(true);
+        const analysisData = await analyzeReferenceImage(attachments[0], aiPrompt);
+        if (analysisData) {
+          finalPrompt = analysisData.combinedPrompt;
+          console.log('Using analyzed prompt for correspondence:', finalPrompt);
+        }
+        setIsAnalyzing(false);
+      }
+
+      // STEP 2: Generate the image
       const response = await fetch('/api/generate/flux', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: aiPrompt }),
+        body: JSON.stringify({ 
+          prompt: finalPrompt,
+          model: aiModel,
+          // Forward attachment for image-to-image if supported by backend
+          images: attachments.length > 0 ? attachments : undefined 
+        }),
       });
 
       if (!response.ok) {
@@ -181,24 +246,24 @@ export function PromptPanel() {
 
       const data = await response.json();
       if (data.imageUrl) {
-        // Add the image to the canvas
         const canvas = useEditorStore.getState().canvas;
         if (canvas) {
           const layerId = generateId();
           const img = await loadImageToCanvas(canvas as any, data.imageUrl, { layerId });
-          
+
           addLayer({
             id: layerId,
             type: 'image',
             src: data.imageUrl,
-            name: `Generated: ${aiPrompt.slice(0, 15)}...`,
+            name: `Generated: ${aiPrompt.slice(0, 15) || 'Reference-based'}...`,
             width: (img.width || 0) * (img.scaleX || 1),
             height: (img.height || 0) * (img.scaleY || 1),
             x: img.left || 0,
             y: img.top || 0,
           });
         }
-        updateAIJob(jobId, { status: 'completed', progress: 100 });
+        updateAIJob(jobId, { status: 'completed', progress: 100, result: data });
+        setAttachments([]);
       } else {
         throw new Error(data.error || 'No image URL returned');
       }
@@ -207,11 +272,11 @@ export function PromptPanel() {
       updateAIJob(jobId, { status: 'failed' });
     } finally {
       setIsGenerating(false);
+      setIsAnalyzing(false);
     }
   };
 
   const handleToolSelect = (tool: AITool) => {
-    // Add job for selected tool
     const job: AIJob = {
       id: `job-${Date.now()}`,
       type: tool.id as any,
@@ -227,70 +292,142 @@ export function PromptPanel() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
       {/* Prompt area */}
-      <div className="flex flex-1 flex-col gap-3 p-3">
-        {/* Model selector */}
-        <Select value={aiModel} onValueChange={(value) => setAIModel(value as AIModel)}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select model" />
-          </SelectTrigger>
-          <SelectContent>
-            {MODELS.map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex-1 flex flex-col gap-4 p-4">
+        {/* Model Selector Dropdown - Decreased Radius */}
+        <div className="flex items-center justify-between shrink-0">
+          <Select value={aiModel} onValueChange={(value) => setAIModel(value as AIModel)}>
+            <SelectTrigger className="w-fit h-8 gap-2 px-3 rounded-lg bg-primary/10 border-primary/20 hover:bg-primary/20 transition-colors text-primary border-0 focus:ring-0 shadow-none ring-0">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
+              <div className="text-[11px] font-bold uppercase tracking-wider">
+                <SelectValue placeholder="Select Model" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="rounded-lg">
+              {MODELS.map((m) => (
+                <SelectItem key={m.value} value={m.value} className="text-xs font-medium">
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-tighter">AI Generation</span>
+        </div>
 
-        {/* Prompt input */}
-        <Textarea
-          value={aiPrompt}
-          onChange={(e) => setAIPrompt(e.target.value)}
-          placeholder="Describe the image you want to generate..."
-          className="min-h-[120px] resize-none flex-1"
-        />
+        {/* Prompt input - Expanded with Integrated Attachment UI - Decreased Radius */}
+        <div className="relative flex-1 group min-h-[260px] flex flex-col bg-muted/10 border border-border/40 rounded-xl overflow-hidden focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/5 transition-all">
+          
+          {/* Attachment Chips Area - Decreased Radius */}
+          {attachments.length > 0 && (
+            <div className="flex gap-3 overflow-x-auto p-3 pb-1">
+              {attachments.map((url, idx) => (
+                <div key={idx} className="relative shrink-0 group/chip">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-background shadow-md group-hover/chip:border-primary/40 transition-all">
+                    <img src={url} alt="Ref" className="w-full h-full object-cover" />
+                  </div>
+                  <button
+                    onClick={() => removeAttachment(idx)}
+                    className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-lg border border-background scale-0 group-hover/chip:scale-100 transition-transform"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {/* Generate button */}
-        <Button onClick={handleGenerate} disabled={!aiPrompt.trim() || isGenerating} className="w-full">
+          {/* Text Area */}
+          <Textarea
+            value={aiPrompt}
+            onChange={(e) => setAIPrompt(e.target.value)}
+            placeholder={attachments.length > 0 ? "Describe changes to the reference image..." : "What would you like to create?..."}
+            className="flex-1 w-full resize-none bg-transparent border-0 focus-visible:ring-0 p-4 text-sm leading-relaxed placeholder:text-muted-foreground/50"
+          />
+
+          {/* Action Bar inside Prompt Box - Decreased Radius */}
+          <div className="flex items-center justify-between p-2 bg-muted/5 border-t border-border/10">
+            <div className="flex items-center gap-2">
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 w-8 rounded-lg bg-background border shadow-sm hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-all"
+                title="Attach Reference Image"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                  <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Button>
+              <span className="text-[10px] font-medium text-muted-foreground/60">
+                {attachments.length > 0 ? `${attachments.length} attached` : 'Add reference'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-1 opacity-20 group-focus-within:opacity-100 transition-opacity">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5 text-primary">
+                <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2Z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Generate button with Animation - Decreased Radius */}
+        <Button 
+          onClick={handleGenerate} 
+          disabled={(!aiPrompt.trim() && attachments.length === 0) || isGenerating} 
+          className={cn(
+            "w-full h-12 relative overflow-hidden transition-all duration-300 rounded-lg shadow-sm",
+            isGenerating ? "bg-primary/90" : "bg-primary hover:shadow-md active:translate-y-px"
+          )}
+        >
           {isGenerating ? (
-            <span className="flex items-center gap-2">
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Generating...
-            </span>
+            <div className="flex items-center justify-center gap-3">
+              <div className="relative flex items-center justify-center">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              </div>
+              <span className="text-sm font-bold tracking-wide">
+                {isAnalyzing ? 'Analyzing Reference...' : 'Creating Magic...'}
+              </span>
+              <div className="absolute bottom-0 left-0 h-1 bg-white/30 animate-[shimmer_2s_infinite]" style={{ width: '100%' }} />
+            </div>
           ) : (
-            <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+            <span className="flex items-center gap-2 text-sm font-bold">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
                 <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2Z" strokeLinejoin="round" />
               </svg>
-              Generate
+              {attachments.length > 0 ? 'Correspond & Generate' : 'Generate Image'}
             </span>
           )}
         </Button>
       </div>
 
-      <div className="h-px w-full bg-border" />
-
-      {/* Bottom: More AI button */}
-      <div className="p-3">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full text-xs h-9"
+      {/* More AI Tools Section - Decreased Radius */}
+      <div className="px-4 pb-4 mt-auto">
+        <div 
           onClick={() => setToolsModalOpen(true)}
+          className="group relative flex items-center justify-between p-3 rounded-xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 cursor-pointer transition-all overflow-hidden"
         >
-          <span className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
-              <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2Z" strokeLinejoin="round" />
-              <path d="M12 2v22M2 12h20" strokeLinecap="round" />
-            </svg>
-            More AI
-          </span>
-        </Button>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-muted group-hover:bg-primary/10 text-muted-foreground group-hover:text-primary transition-colors">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2Z" strokeLinejoin="round" />
+                <path d="M12 2v22M2 12h20" strokeLinecap="round" opacity="0.3" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-bold">Advanced Tools</p>
+              <p className="text-[10px] text-muted-foreground">Upscale, Restore & more</p>
+            </div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors">
+            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
       </div>
 
-      {/* AI Tools Modal */}
+      {/* AI Tools Modal - Decreased Radius */}
       {toolsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-xl border bg-background shadow-2xl max-h-[80vh] flex flex-col">

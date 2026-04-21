@@ -29,6 +29,9 @@ export const initCanvas = (
     preserveObjectStacking: true,
     renderOnAddRemove: false,
     stateful: false,
+    // Enable endless canvas features
+    allowTouchScrolling: true,
+    isDrawingMode: false,
   });
 
   // Configure fabric defaults
@@ -43,6 +46,9 @@ export const initCanvas = (
     borderScaleFactor: 2,
   });
 
+  // Set up endless canvas viewport
+  canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+  
   return canvas;
 };
 
@@ -225,6 +231,17 @@ export const loadImageToCanvas = async (
   const img = await FabricImage.fromURL(url, {
     crossOrigin: 'anonymous',
   });
+  
+  // Auto-scale to a decent size if too large
+  const MAX_DIMENSION = 512;
+  if ((img.width || 0) > MAX_DIMENSION || (img.height || 0) > MAX_DIMENSION) {
+    const scale = MAX_DIMENSION / Math.max(img.width || 1, img.height || 1);
+    img.set({
+      scaleX: scale,
+      scaleY: scale,
+    });
+  }
+
   const id = options.layerId || generateId();
   img.set({
     left: options.x ?? (canvas.width || 0) / 2 - ((img.width || 0) * (img.scaleX || 1)) / 2,

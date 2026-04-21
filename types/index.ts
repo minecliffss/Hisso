@@ -96,7 +96,18 @@ export interface CanvasSettings {
 }
 
 // AI Model Types
-export type AIModel = 'qwen-image' | 'flux' | 'sdxl' | 'stable-diffusion';
+export type AIModel = 'qwen-image' | 'flux' | 'nvidia-kimi' | 'sdxl' | 'stable-diffusion';
+
+// Vision/Analysis AI Models (OpenAI compatible)
+export type AnalysisModel = 'kimi' | 'gemma' | 'openai' | 'custom';
+
+export interface AnalysisConfig {
+  model: AnalysisModel;
+  apiKey: string;
+  baseUrl?: string; // For custom endpoints
+  temperature?: number;
+  maxTokens?: number;
+}
 
 // AI Types
 export type AIJobType =
@@ -121,8 +132,61 @@ export interface AIJob {
   resultUrl?: string;
   error?: string;
   progress: number;
+  result?: any;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Chat Message Types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  attachments?: string[]; // Array of image data URLs
+  imageUrl?: string; // Generated image URL from AI
+  isError?: boolean;
+  timestamp: Date;
+}
+
+// Image Analysis Types
+export interface ImageAnalysisRequest {
+  image: string; // Base64 or URL
+  userPrompt: string;
+  mode: 'analyze-only' | 'analyze-and-generate' | 'reference-style';
+}
+
+export interface ImageAnalysis {
+  subject: string;
+  composition: string;
+  cameraAngle: string;
+  pose: string;
+  facialExpression?: string;
+  clothing?: string;
+  colors: string[];
+  lighting: string;
+  background: string;
+  artStyle: string;
+  realismLevel: string;
+  aspectRatio: string;
+  importantObjects: string[];
+  textInImage?: string;
+  mood: string;
+  perspective: string;
+  proportions: string;
+  colorPalette: string;
+}
+
+export interface AnalysisResult {
+  analysis: ImageAnalysis;
+  combinedPrompt: string; // Analysis + user prompt merged
+  suggestedChanges?: string[];
+}
+
+export interface ReferenceImageWorkflow {
+  referenceImage: string;
+  analysisResult?: AnalysisResult;
+  userModifications?: string;
+  finalPrompt?: string;
 }
 
 // Export Types

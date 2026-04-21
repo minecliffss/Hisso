@@ -2,15 +2,17 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { CanvasComponent } from '@/components/editor/Canvas/Canvas';
-import { PromptPanel } from '@/components/editor/PromptPanel/PromptPanel';
+import { ChatPanel } from '@/components/editor/ChatPanel/ChatPanel';
 import { SettingsDialog } from '@/components/editor/SettingsDialog/SettingsDialog';
 import { useEditorStore } from '@/lib/store/editor';
 import { loadImageToCanvas } from '@/lib/canvas/fabric';
 import { readFileAsDataURL } from '@/lib/utils/helpers';
 import { Button } from '@/components/ui/button';
 import { LayersSection } from './LayersSection';
+import { PromptPanel } from './PromptPanel/PromptPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { storageService, projectService } from '@/lib/services/supabase-service';
-import { Save, Upload, Moon, Sun, Settings, FilePlus } from 'lucide-react';
+import { Save, Upload, Moon, Sun, Settings, FilePlus, Sparkles, Layers } from 'lucide-react';
 import { uploadImageAction } from '@/lib/actions/upload';
 
 export function Editor() {
@@ -154,19 +156,47 @@ export function Editor() {
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Canvas */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Canvas - Main Area */}
+        <div className="flex flex-1 flex-col overflow-hidden bg-black/50">
           <CanvasComponent />
         </div>
 
-        {/* Right: Layers and Prompt panels */}
-        <aside className="w-80 border-l bg-background shrink-0 flex flex-col">
-          <div className="flex-1 overflow-hidden border-b">
-            <LayersSection />
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <PromptPanel />
-          </div>
+        {/* Right Sidebar: Changeable Sections */}
+        <aside className="w-84 border-l bg-background shrink-0 flex flex-col h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
+          <Tabs defaultValue="ai" className="flex-1 flex flex-col">
+            <div className="px-3 py-2 border-b bg-background">
+              <TabsList className="w-full grid grid-cols-2 h-12 p-1.5">
+                <TabsTrigger value="ai" className="gap-2 text-sm">
+                  <Sparkles className="h-4.5 w-4.5" />
+                  AI Design
+                </TabsTrigger>
+                <TabsTrigger value="layers" className="gap-2 text-sm">
+                  <Layers className="h-4.5 w-4.5" />
+                  Layers
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Tab 1: AI Design - Chat Bot Style (Full Height) */}
+            <TabsContent value="ai" className="flex-1 relative min-h-0 m-0 p-0 border-0 focus-visible:ring-0 overflow-hidden">
+              <ChatPanel />
+            </TabsContent>
+
+            {/* Tab 2: Layers Section - Full Height */}
+            <TabsContent value="layers" className="flex-1 flex flex-col overflow-hidden m-0 p-0">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <span className="text-sm font-bold tracking-tight">Project Layers</span>
+                <Button variant="ghost" size="icon-xs" className="h-6 w-6">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                    <path d="M7 13l5 5 5-5M7 6l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <LayersSection />
+              </div>
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
 
