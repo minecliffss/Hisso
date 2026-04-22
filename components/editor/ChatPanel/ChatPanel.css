@@ -254,6 +254,17 @@
   color: rgba(255, 255, 255, 0.25);
 }
 
+.chat-empty-hint {
+  font-size: 10px;
+  color: rgba(249, 115, 22, 0.4);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+:is(.dark) .chat-empty-hint {
+  color: rgba(251, 146, 60, 0.35);
+}
+
 /* Quick suggestion chips */
 .chat-suggestions {
   display: flex;
