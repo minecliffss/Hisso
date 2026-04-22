@@ -161,17 +161,20 @@ export function Editor() {
           <CanvasComponent />
         </div>
 
-        {/* Right Sidebar: Changeable Sections */}
-        <aside className="w-84 border-l bg-background shrink-0 flex flex-col h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
-          <Tabs defaultValue="ai" className="flex-1 flex flex-col">
-            <div className="px-3 py-2 border-b bg-background">
-              <TabsList className="w-full grid grid-cols-2 h-12 p-1.5">
-                <TabsTrigger value="ai" className="gap-2 text-sm">
-                  <Sparkles className="h-4.5 w-4.5" />
+        {/* Right Sidebar: Redesigned */}
+        <aside className="w-84 shrink-0 flex flex-col h-full min-h-0 overflow-hidden relative bg-background border-l border-black/5 dark:border-white/5">
+          {/* Subtle gradient accent at top */}
+          <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(249,115,22,0.2), transparent)' }} />
+
+          <Tabs defaultValue="ai" className="flex-1 flex flex-col min-h-0">
+            <div className="px-3 pt-2 pb-0">
+              <TabsList className="w-full grid grid-cols-2 h-10 p-1 rounded-[10px] bg-black/[0.03] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.04]">
+                <TabsTrigger value="ai" className="gap-2 text-xs font-semibold" style={{ borderRadius: '8px' }}>
+                  <Sparkles className="h-3.5 w-3.5" />
                   AI Design
                 </TabsTrigger>
-                <TabsTrigger value="layers" className="gap-2 text-sm">
-                  <Layers className="h-4.5 w-4.5" />
+                <TabsTrigger value="layers" className="gap-2 text-xs font-semibold" style={{ borderRadius: '8px' }}>
+                  <Layers className="h-3.5 w-3.5" />
                   Layers
                 </TabsTrigger>
               </TabsList>
@@ -184,9 +187,9 @@ export function Editor() {
 
             {/* Tab 2: Layers Section - Full Height */}
             <TabsContent value="layers" className="flex-1 flex flex-col overflow-hidden m-0 p-0">
-              <div className="flex items-center justify-between px-4 py-3 border-b">
-                <span className="text-sm font-bold tracking-tight">Project Layers</span>
-                <Button variant="ghost" size="icon-xs" className="h-6 w-6">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                <span className="text-xs font-bold tracking-tight text-foreground/50">Project Layers</span>
+                <Button variant="ghost" size="icon-xs" className="h-6 w-6 opacity-40 hover:opacity-100 transition-opacity">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
                     <path d="M7 13l5 5 5-5M7 6l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
